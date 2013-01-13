@@ -7,7 +7,7 @@ Install the module with: `npm install Print4e`
 
 ```javascript
 var Print4e = require('Print4e');
-Print4e.awesome(); // "awesome"
+Print4e.print_character();
 ```
 
 ## Documentation
