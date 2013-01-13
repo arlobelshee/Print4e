@@ -24,13 +24,18 @@
     "node": ">= 0.6.0"
   },
   "scripts": {
-    "test": "grunt test"
+    "test": "grunt incremental"
   },
   "devDependencies": {
     "grunt": "~0.3.17",
     "mocha": "~1.8.1",
     "chai": "~1.4.2",
-    "grunt-coffee": "0.0.6"
+    "grunt-contrib-coffee": "~0.3.2",
+    "grunt-simple-mocha": "~0.2",
+    "grunt-coffeelint": "0.0.3"
   },
-  "keywords": []
+  "keywords": [],
+  "dependencies": {
+    "async": "~0.1.22"
+  }
 }
