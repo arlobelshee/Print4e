@@ -28,7 +28,7 @@ namespace Print4e.Core.DataAccess
 		}
 
 		[NotNull]
-		public string Name { get; private set; }
+		public string Name { get; set; }
 
 		[NotNull]
 		public static CharacterFile FromXml([NotNull] string fileContents)

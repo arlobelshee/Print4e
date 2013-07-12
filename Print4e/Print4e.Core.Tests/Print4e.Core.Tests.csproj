@@ -47,8 +47,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Data\ParseCharacterFile.cs" />
+    <Compile Include="CombiningDataSources.cs" />
+    <Compile Include="ParseCharacterFile.cs" />
     <Compile Include="Data\TestData.cs" />
+    <Compile Include="Data\Kuri.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

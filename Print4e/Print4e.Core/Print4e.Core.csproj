@@ -36,6 +36,8 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Api\AssembleCharacter.cs" />
+    <Compile Include="Api\Character.cs" />
     <Compile Include="DataAccess\CharacterFile.cs" />
     <Compile Include="Utils\CodeAnnotations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

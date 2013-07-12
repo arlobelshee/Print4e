@@ -6,8 +6,9 @@
 using FluentAssertions;
 using NUnit.Framework;
 using Print4e.Core.DataAccess;
+using Print4e.Core.Tests.Data;
 
-namespace Print4e.Core.Tests.Data
+namespace Print4e.Core.Tests
 {
 	[TestFixture]
 	public class ParseCharacterFile
@@ -16,8 +17,7 @@ namespace Print4e.Core.Tests.Data
 		public void ShouldFindTheName()
 		{
 			var result = CharacterFile.FromXml(TestData.Kuri);
-			result.Name.Should()
-				.Be("Kuri");
+			result.ShouldBeEquivalentTo(Kuri.MainFile);
 		}
 	}
 }
