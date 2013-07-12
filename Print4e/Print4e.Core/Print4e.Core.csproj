@@ -5,7 +5,7 @@
     <MinimumVisualStudioVersion>10.0</MinimumVisualStudioVersion>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{4159f8b5-918a-48fe-9ecf-d68c5dfa8012}</ProjectGuid>
+    <ProjectGuid>{4159F8B5-918A-48FE-9ECF-D68C5DFA8012}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Print4e.Core</RootNamespace>
@@ -36,7 +36,8 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="DataAccess\CharacterFile.cs" />
+    <Compile Include="Utils\CodeAnnotations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
@@ -47,5 +48,4 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-
 </Project>

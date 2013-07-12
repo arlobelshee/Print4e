@@ -48,13 +48,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Data\ParseCharacterFile.cs" />
-    <Compile Include="GettingStarted.cs" />
+    <Compile Include="Data\TestData.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Data\Kuri.conf" />
     <EmbeddedResource Include="Data\Kuri.dnd4e" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Print4e.Core\Print4e.Core.csproj">
+      <Project>{4159f8b5-918a-48fe-9ecf-d68c5dfa8012}</Project>
+      <Name>Print4e.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
