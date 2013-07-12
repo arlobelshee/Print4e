@@ -4,9 +4,10 @@
 // All rights reserved. Usage as permitted by the LICENSE.txt file for this project.
 
 using JetBrains.Annotations;
+using Print4e.Core.Api;
 using Print4e.Core.DataAccess;
 
-namespace Print4e.Core.Api
+namespace Print4e.Core
 {
 	public static class AssembleCharacter
 	{
