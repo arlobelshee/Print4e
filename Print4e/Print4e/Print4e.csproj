@@ -113,6 +113,9 @@
     <Compile Include="Common\LayoutUpdateMonitor.cs" />
     <Compile Include="Common\ModifierKeys.cs" />
     <Compile Include="Common\ObservableDictionary.cs" />
+    <Compile Include="DataModel\Card.cs" />
+    <Compile Include="DataModel\Character.cs" />
+    <Compile Include="DataModel\SampleDataCommon.cs" />
     <Compile Include="ItemsPage.xaml.cs">
       <DependentUpon>ItemsPage.xaml</DependentUpon>
     </Compile>
