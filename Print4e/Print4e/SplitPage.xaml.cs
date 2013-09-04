@@ -42,7 +42,7 @@ namespace Print4e
 		protected override void LoadState(Object navigationParameter, Dictionary<String, Object> pageState)
 		{
 			// TODO: Create an appropriate data model for your problem domain to replace the sample data
-			var group = SampleDataSource.GetGroup((String) navigationParameter);
+			var group = SampleDataSource.FromId((String) navigationParameter);
 			DefaultViewModel["Group"] = group;
 			DefaultViewModel["Items"] = group.Items;
 
@@ -74,7 +74,7 @@ namespace Print4e
 		{
 			if (itemsViewSource.View != null)
 			{
-				var selectedItem = (SampleDataItem) itemsViewSource.View.CurrentItem;
+				var selectedItem = (Card) itemsViewSource.View.CurrentItem;
 				if (selectedItem != null) pageState["SelectedItem"] = selectedItem.UniqueId;
 			}
 		}
@@ -159,7 +159,7 @@ namespace Print4e
 		///    view state except when there is a selected item in portrait and snapped views where
 		///    this additional logical page is represented by adding a suffix of _Detail.
 		/// </returns>
-		protected override string DetermineVisualState(ApplicationViewState viewState)
+		public override string DetermineVisualState(ApplicationViewState viewState)
 		{
 			// Update the back button's enabled state when the view state changes
 			var logicalPageBack = UsingLogicalPageNavigation(viewState) && itemListView.SelectedItem != null;

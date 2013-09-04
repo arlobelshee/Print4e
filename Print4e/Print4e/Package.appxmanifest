@@ -15,8 +15,8 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="Print4e.App">
-      <VisualElements DisplayName="Print4e" Logo="Assets\Logo.png" SmallLogo="Assets\SmallLogo.png" Description="A simple app to print your 4e characters as a set of cards. Both the character sheet and all powers are cards, all designed for easy reference during play." ForegroundText="light" BackgroundColor="#464646">
-        <DefaultTile ShowName="allLogos" />
+      <VisualElements DisplayName="Print4e" Logo="Assets\Logo.png" SmallLogo="Assets\SmallLogo.png" Description="A simple app to print your 4e characters as a set of cards. Both the character sheet and all powers are cards, all designed for easy reference during play." ForegroundText="light" BackgroundColor="#464646" ToastCapable="false">
+        <DefaultTile ShowName="allLogos" ShortName="Print 4e" />
         <SplashScreen Image="Assets\SplashScreen.png" />
         <InitialRotationPreference>
           <Rotation Preference="landscape" />

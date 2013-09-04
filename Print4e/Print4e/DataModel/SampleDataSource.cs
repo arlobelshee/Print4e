@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using JetBrains.Annotations;
 using Print4e.Common;
 using Windows.Foundation.Metadata;
 using Windows.UI.Xaml.Media;
@@ -23,15 +24,19 @@ using Windows.UI.Xaml.Media.Imaging;
 namespace Print4e.Data
 {
 	/// <summary>
-	///    Base class for <see cref="SampleDataItem" /> and <see cref="SampleDataGroup" /> that
+	///    Base class for <see cref="Card" /> and <see cref="Character" /> that
 	///    defines properties common to both.
 	/// </summary>
 	[WebHostHidden]
 	public abstract class SampleDataCommon : BindableBase
 	{
-		private static readonly Uri _baseUri = new Uri("ms-appx:///");
+		private static readonly Uri BaseUri = new Uri("ms-appx:///");
 
-		public SampleDataCommon(String uniqueId, String title, String subtitle, String imagePath, String description)
+		protected SampleDataCommon([NotNull] String uniqueId,
+			String title,
+			String subtitle,
+			String imagePath,
+			String description)
 		{
 			_uniqueId = uniqueId;
 			_title = title;
@@ -40,7 +45,9 @@ namespace Print4e.Data
 			_imagePath = imagePath;
 		}
 
-		private string _uniqueId = string.Empty;
+		[NotNull] private string _uniqueId = string.Empty;
+
+		[NotNull]
 		public string UniqueId { get { return _uniqueId; } set { SetProperty(ref _uniqueId, value); } }
 
 		private string _title = string.Empty;
@@ -59,7 +66,7 @@ namespace Print4e.Data
 		{
 			get
 			{
-				if (_image == null && _imagePath != null) _image = new BitmapImage(new Uri(_baseUri, _imagePath));
+				if (_image == null && _imagePath != null) _image = new BitmapImage(new Uri(BaseUri, _imagePath));
 				return _image;
 			}
 
@@ -86,15 +93,15 @@ namespace Print4e.Data
 	/// <summary>
 	///    Generic item data model.
 	/// </summary>
-	public class SampleDataItem : SampleDataCommon
+	public class Card : SampleDataCommon
 	{
-		public SampleDataItem(String uniqueId,
+		public Card([NotNull] String uniqueId,
 			String title,
 			String subtitle,
 			String imagePath,
 			String description,
 			String content,
-			SampleDataGroup group) : base(uniqueId, title, subtitle, imagePath, description)
+			Character group) : base(uniqueId, title, subtitle, imagePath, description)
 		{
 			_content = content;
 			_group = group;
@@ -103,22 +110,22 @@ namespace Print4e.Data
 		private string _content = string.Empty;
 		public string Content { get { return _content; } set { SetProperty(ref _content, value); } }
 
-		private SampleDataGroup _group;
-		public SampleDataGroup Group { get { return _group; } set { SetProperty(ref _group, value); } }
+		private Character _group;
+		public Character Group { get { return _group; } set { SetProperty(ref _group, value); } }
 	}
 
 	/// <summary>
 	///    Generic group data model.
 	/// </summary>
-	public class SampleDataGroup : SampleDataCommon
+	public class Character : SampleDataCommon
 	{
-		public SampleDataGroup(String uniqueId, String title, String subtitle, String imagePath, String description)
+		public Character([NotNull] String uniqueId, String title, String subtitle, String imagePath, String description)
 			: base(uniqueId, title, subtitle, imagePath, description)
 		{
 			Items.CollectionChanged += ItemsCollectionChanged;
 		}
 
-		private void ItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+		private void ItemsCollectionChanged([NotNull] object sender, [NotNull] NotifyCollectionChangedEventArgs e)
 		{
 			// Provides a subset of the full items collection to bind to from a GroupedItemsPage
 			// for two reasons: GridView will not virtualize large items collections, and it
@@ -170,11 +177,15 @@ namespace Print4e.Data
 			}
 		}
 
-		private readonly ObservableCollection<SampleDataItem> _items = new ObservableCollection<SampleDataItem>();
-		public ObservableCollection<SampleDataItem> Items { get { return _items; } }
+		[NotNull] private readonly ObservableCollection<Card> _items = new ObservableCollection<Card>();
 
-		private readonly ObservableCollection<SampleDataItem> _topItem = new ObservableCollection<SampleDataItem>();
-		public ObservableCollection<SampleDataItem> TopItems { get { return _topItem; } }
+		[NotNull]
+		public ObservableCollection<Card> Items { get { return _items; } }
+
+		[NotNull] private readonly ObservableCollection<Card> _topItem = new ObservableCollection<Card>();
+
+		[NotNull]
+		public ObservableCollection<Card> TopItems { get { return _topItem; } }
 	}
 
 	/// <summary>
@@ -184,33 +195,30 @@ namespace Print4e.Data
 	/// </summary>
 	public sealed class SampleDataSource
 	{
-		private static readonly SampleDataSource _sampleDataSource = new SampleDataSource();
+		[NotNull] private static readonly SampleDataSource Instance = new SampleDataSource();
+		[NotNull] private readonly ObservableCollection<Character> _allGroups = new ObservableCollection<Character>();
 
-		private readonly ObservableCollection<SampleDataGroup> _allGroups = new ObservableCollection<SampleDataGroup>();
-		public ObservableCollection<SampleDataGroup> AllGroups { get { return _allGroups; } }
+		[NotNull]
+		public ObservableCollection<Character> AllGroups { get { return _allGroups; } }
 
-		public static IEnumerable<SampleDataGroup> GetGroups(string uniqueId)
+		[NotNull]
+		public static IEnumerable<Character> AllCharacters()
 		{
-			if (!uniqueId.Equals("AllGroups")) throw new ArgumentException("Only 'AllGroups' is supported as a collection of groups");
-
-			return _sampleDataSource.AllGroups;
+			return Instance.AllGroups;
 		}
 
-		public static SampleDataGroup GetGroup(string uniqueId)
+		[CanBeNull]
+		public static Character FromId([NotNull] string uniqueId)
 		{
 			// Simple linear search is acceptable for small data sets
-			var matches = _sampleDataSource.AllGroups.Where((group) => group.UniqueId.Equals(uniqueId));
-			if (matches.Count() == 1) return matches.First();
-			return null;
+			return Instance.AllGroups.FirstOrDefault(c => c != null && c.UniqueId.Equals(uniqueId));
 		}
 
-		public static SampleDataItem GetItem(string uniqueId)
+		public static Card GetItem(string uniqueId)
 		{
 			// Simple linear search is acceptable for small data sets
-			var matches = _sampleDataSource.AllGroups.SelectMany(group => group.Items)
-				.Where((item) => item.UniqueId.Equals(uniqueId));
-			if (matches.Count() == 1) return matches.First();
-			return null;
+			return Instance.AllGroups.SelectMany(@group => @group.Items)
+				.FirstOrDefault((item) => item.UniqueId.Equals(uniqueId));
 		}
 
 		public SampleDataSource()
@@ -218,40 +226,40 @@ namespace Print4e.Data
 			var ITEM_CONTENT = String.Format("Item Content: {0}\n\n{0}\n\n{0}\n\n{0}\n\n{0}\n\n{0}\n\n{0}",
 				"Curabitur class aliquam vestibulum nam curae maecenas sed integer cras phasellus suspendisse quisque donec dis praesent accumsan bibendum pellentesque condimentum adipiscing etiam consequat vivamus dictumst aliquam duis convallis scelerisque est parturient ullamcorper aliquet fusce suspendisse nunc hac eleifend amet blandit facilisi condimentum commodo scelerisque faucibus aenean ullamcorper ante mauris dignissim consectetuer nullam lorem vestibulum habitant conubia elementum pellentesque morbi facilisis arcu sollicitudin diam cubilia aptent vestibulum auctor eget dapibus pellentesque inceptos leo egestas interdum nulla consectetuer suspendisse adipiscing pellentesque proin lobortis sollicitudin augue elit mus congue fermentum parturient fringilla euismod feugiat");
 
-			var group1 = new SampleDataGroup("Group-1",
+			var group1 = new Character("Group-1",
 				"Group Title: 1",
 				"Group Subtitle: 1",
 				"Assets/DarkGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group1.Items.Add(new SampleDataItem("Group-1-Item-1",
+			group1.Items.Add(new Card("Group-1-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group1));
-			group1.Items.Add(new SampleDataItem("Group-1-Item-2",
+			group1.Items.Add(new Card("Group-1-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group1));
-			group1.Items.Add(new SampleDataItem("Group-1-Item-3",
+			group1.Items.Add(new Card("Group-1-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group1));
-			group1.Items.Add(new SampleDataItem("Group-1-Item-4",
+			group1.Items.Add(new Card("Group-1-Item-4",
 				"Item Title: 4",
 				"Item Subtitle: 4",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group1));
-			group1.Items.Add(new SampleDataItem("Group-1-Item-5",
+			group1.Items.Add(new Card("Group-1-Item-5",
 				"Item Title: 5",
 				"Item Subtitle: 5",
 				"Assets/MediumGray.png",
@@ -260,26 +268,26 @@ namespace Print4e.Data
 				group1));
 			AllGroups.Add(group1);
 
-			var group2 = new SampleDataGroup("Group-2",
+			var group2 = new Character("Group-2",
 				"Group Title: 2",
 				"Group Subtitle: 2",
 				"Assets/LightGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group2.Items.Add(new SampleDataItem("Group-2-Item-1",
+			group2.Items.Add(new Card("Group-2-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group2));
-			group2.Items.Add(new SampleDataItem("Group-2-Item-2",
+			group2.Items.Add(new Card("Group-2-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group2));
-			group2.Items.Add(new SampleDataItem("Group-2-Item-3",
+			group2.Items.Add(new Card("Group-2-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/LightGray.png",
@@ -288,54 +296,54 @@ namespace Print4e.Data
 				group2));
 			AllGroups.Add(group2);
 
-			var group3 = new SampleDataGroup("Group-3",
+			var group3 = new Character("Group-3",
 				"Group Title: 3",
 				"Group Subtitle: 3",
 				"Assets/MediumGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group3.Items.Add(new SampleDataItem("Group-3-Item-1",
+			group3.Items.Add(new Card("Group-3-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-2",
+			group3.Items.Add(new Card("Group-3-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-3",
+			group3.Items.Add(new Card("Group-3-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-4",
+			group3.Items.Add(new Card("Group-3-Item-4",
 				"Item Title: 4",
 				"Item Subtitle: 4",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-5",
+			group3.Items.Add(new Card("Group-3-Item-5",
 				"Item Title: 5",
 				"Item Subtitle: 5",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-6",
+			group3.Items.Add(new Card("Group-3-Item-6",
 				"Item Title: 6",
 				"Item Subtitle: 6",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group3));
-			group3.Items.Add(new SampleDataItem("Group-3-Item-7",
+			group3.Items.Add(new Card("Group-3-Item-7",
 				"Item Title: 7",
 				"Item Subtitle: 7",
 				"Assets/MediumGray.png",
@@ -344,47 +352,47 @@ namespace Print4e.Data
 				group3));
 			AllGroups.Add(group3);
 
-			var group4 = new SampleDataGroup("Group-4",
+			var group4 = new Character("Group-4",
 				"Group Title: 4",
 				"Group Subtitle: 4",
 				"Assets/LightGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group4.Items.Add(new SampleDataItem("Group-4-Item-1",
+			group4.Items.Add(new Card("Group-4-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group4));
-			group4.Items.Add(new SampleDataItem("Group-4-Item-2",
+			group4.Items.Add(new Card("Group-4-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group4));
-			group4.Items.Add(new SampleDataItem("Group-4-Item-3",
+			group4.Items.Add(new Card("Group-4-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group4));
-			group4.Items.Add(new SampleDataItem("Group-4-Item-4",
+			group4.Items.Add(new Card("Group-4-Item-4",
 				"Item Title: 4",
 				"Item Subtitle: 4",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group4));
-			group4.Items.Add(new SampleDataItem("Group-4-Item-5",
+			group4.Items.Add(new Card("Group-4-Item-5",
 				"Item Title: 5",
 				"Item Subtitle: 5",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group4));
-			group4.Items.Add(new SampleDataItem("Group-4-Item-6",
+			group4.Items.Add(new Card("Group-4-Item-6",
 				"Item Title: 6",
 				"Item Subtitle: 6",
 				"Assets/LightGray.png",
@@ -393,33 +401,33 @@ namespace Print4e.Data
 				group4));
 			AllGroups.Add(group4);
 
-			var group5 = new SampleDataGroup("Group-5",
+			var group5 = new Character("Group-5",
 				"Group Title: 5",
 				"Group Subtitle: 5",
 				"Assets/MediumGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group5.Items.Add(new SampleDataItem("Group-5-Item-1",
+			group5.Items.Add(new Card("Group-5-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group5));
-			group5.Items.Add(new SampleDataItem("Group-5-Item-2",
+			group5.Items.Add(new Card("Group-5-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group5));
-			group5.Items.Add(new SampleDataItem("Group-5-Item-3",
+			group5.Items.Add(new Card("Group-5-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group5));
-			group5.Items.Add(new SampleDataItem("Group-5-Item-4",
+			group5.Items.Add(new Card("Group-5-Item-4",
 				"Item Title: 4",
 				"Item Subtitle: 4",
 				"Assets/MediumGray.png",
@@ -428,61 +436,61 @@ namespace Print4e.Data
 				group5));
 			AllGroups.Add(group5);
 
-			var group6 = new SampleDataGroup("Group-6",
+			var group6 = new Character("Group-6",
 				"Group Title: 6",
 				"Group Subtitle: 6",
 				"Assets/DarkGray.png",
 				"Group Description: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus tempor scelerisque lorem in vehicula. Aliquam tincidunt, lacus ut sagittis tristique, turpis massa volutpat augue, eu rutrum ligula ante a ante");
-			group6.Items.Add(new SampleDataItem("Group-6-Item-1",
+			group6.Items.Add(new Card("Group-6-Item-1",
 				"Item Title: 1",
 				"Item Subtitle: 1",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-2",
+			group6.Items.Add(new Card("Group-6-Item-2",
 				"Item Title: 2",
 				"Item Subtitle: 2",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-3",
+			group6.Items.Add(new Card("Group-6-Item-3",
 				"Item Title: 3",
 				"Item Subtitle: 3",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-4",
+			group6.Items.Add(new Card("Group-6-Item-4",
 				"Item Title: 4",
 				"Item Subtitle: 4",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-5",
+			group6.Items.Add(new Card("Group-6-Item-5",
 				"Item Title: 5",
 				"Item Subtitle: 5",
 				"Assets/LightGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-6",
+			group6.Items.Add(new Card("Group-6-Item-6",
 				"Item Title: 6",
 				"Item Subtitle: 6",
 				"Assets/MediumGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-7",
+			group6.Items.Add(new Card("Group-6-Item-7",
 				"Item Title: 7",
 				"Item Subtitle: 7",
 				"Assets/DarkGray.png",
 				"Item Description: Pellentesque porta, mauris quis interdum vehicula, urna sapien ultrices velit, nec venenatis dui odio in augue. Cras posuere, enim a cursus convallis, neque turpis malesuada erat, ut adipiscing neque tortor ac erat.",
 				ITEM_CONTENT,
 				group6));
-			group6.Items.Add(new SampleDataItem("Group-6-Item-8",
+			group6.Items.Add(new Card("Group-6-Item-8",
 				"Item Title: 8",
 				"Item Subtitle: 8",
 				"Assets/LightGray.png",

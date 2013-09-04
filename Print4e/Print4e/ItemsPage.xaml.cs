@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Print4e.Common;
 using Print4e.Data;
 using Windows.UI.Xaml.Controls;
@@ -38,8 +39,10 @@ namespace Print4e
 		/// </param>
 		protected override void LoadState(Object navigationParameter, Dictionary<String, Object> pageState)
 		{
-			// TODO: Create an appropriate data model for your problem domain to replace the sample data
-			var sampleDataGroups = SampleDataSource.GetGroups((String) navigationParameter);
+			Debug.Assert(navigationParameter != null, "navigationParameter != null");
+			if (!((String) navigationParameter).Equals("AllGroups")) throw new ArgumentException("Only 'AllGroups' is supported as a collection of groups");
+
+			var sampleDataGroups = SampleDataSource.AllCharacters();
 			DefaultViewModel["Items"] = sampleDataGroups;
 		}
 
@@ -55,7 +58,7 @@ namespace Print4e
 		{
 			// Navigate to the appropriate destination page, configuring the new page
 			// by passing required information as a navigation parameter
-			var groupId = ((SampleDataGroup) e.ClickedItem).UniqueId;
+			var groupId = ((Character) e.ClickedItem).UniqueId;
 			Frame.Navigate(typeof (SplitPage), groupId);
 		}
 	}

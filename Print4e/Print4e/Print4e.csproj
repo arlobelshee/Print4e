@@ -101,11 +101,18 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .Net Framework and Windows SDK are automatically included -->
+    <ProjectReference Include="..\Print4e.Core\Print4e.Core.csproj">
+      <Project>{4159f8b5-918a-48fe-9ecf-d68c5dfa8012}</Project>
+      <Name>Print4e.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Common\LayoutUpdateMonitor.cs" />
+    <Compile Include="Common\ModifierKeys.cs" />
+    <Compile Include="Common\ObservableDictionary.cs" />
     <Compile Include="ItemsPage.xaml.cs">
       <DependentUpon>ItemsPage.xaml</DependentUpon>
     </Compile>
@@ -125,7 +132,6 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
-    <None Include="Common\ReadMe.txt" />
     <None Include="Print4e_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>

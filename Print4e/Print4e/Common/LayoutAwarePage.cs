@@ -4,14 +4,16 @@
 // All rights reserved. Usage as permitted by the LICENSE.txt file for this project.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
+using JetBrains.Annotations;
+using Print4e.Core.Utils;
 using Windows.ApplicationModel;
 using Windows.Foundation.Collections;
 using Windows.Foundation.Metadata;
 using Windows.System;
 using Windows.UI.Core;
+using Windows.UI.Input;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -45,33 +47,35 @@ namespace Print4e.Common
 		/// <summary>
 		///    Identifies the <see cref="DefaultViewModel" /> dependency property.
 		/// </summary>
-		public static readonly DependencyProperty DefaultViewModelProperty = DependencyProperty.Register("DefaultViewModel",
-			typeof (IObservableMap<String, Object>),
-			typeof (LayoutAwarePage),
-			null);
-
-		private List<Control> _layoutAwareControls;
+		[NotNull] public static readonly DependencyProperty DefaultViewModelProperty =
+			DependencyProperty.Register("DefaultViewModel",
+				typeof (IObservableMap<String, Object>),
+				typeof (LayoutAwarePage),
+				null);
 
 		/// <summary>
 		///    Initializes a new instance of the <see cref="LayoutAwarePage" /> class.
 		/// </summary>
 		public LayoutAwarePage()
 		{
+			_layoutUpdateMonitor = new LayoutUpdateMonitor(this);
 			if (DesignMode.DesignModeEnabled) return;
 
-			// Create an empty default view model
 			DefaultViewModel = new ObservableDictionary<String, Object>();
 
 			// When this page is part of the visual tree make two changes:
 			// 1) Map application view state to visual state for the page
 			// 2) Handle keyboard and mouse navigation requests
 			Loaded += (sender, e) => {
-				StartLayoutUpdates(sender, e);
+				StartLayoutUpdates(sender as Control);
 
 				// Keyboard and mouse navigation only apply when occupying the entire window
-				if (ActualHeight == Window.Current.Bounds.Height && ActualWidth == Window.Current.Bounds.Width)
+				Debug.Assert(Window.Current != null, "Window.Current != null");
+				if (ActualHeight.ApxEquals(Window.Current.Bounds.Height) && ActualWidth.ApxEquals(Window.Current.Bounds.Width))
 				{
 					// Listen to the window directly so focus isn't required
+					Debug.Assert(Window.Current.CoreWindow != null, "Window.Current.CoreWindow != null");
+					Debug.Assert(Window.Current.CoreWindow.Dispatcher != null, "Window.Current.CoreWindow.Dispatcher != null");
 					Window.Current.CoreWindow.Dispatcher.AcceleratorKeyActivated += CoreDispatcher_AcceleratorKeyActivated;
 					Window.Current.CoreWindow.PointerPressed += CoreWindow_PointerPressed;
 				}
@@ -79,7 +83,10 @@ namespace Print4e.Common
 
 			// Undo the same changes when the page is no longer visible
 			Unloaded += (sender, e) => {
-				StopLayoutUpdates(sender, e);
+				StopLayoutUpdates(sender as Control);
+				Debug.Assert(Window.Current != null, "Window.Current != null");
+				Debug.Assert(Window.Current.CoreWindow != null, "Window.Current.CoreWindow != null");
+				Debug.Assert(Window.Current.CoreWindow.Dispatcher != null, "Window.Current.CoreWindow.Dispatcher != null");
 				Window.Current.CoreWindow.Dispatcher.AcceleratorKeyActivated -= CoreDispatcher_AcceleratorKeyActivated;
 				Window.Current.CoreWindow.PointerPressed -= CoreWindow_PointerPressed;
 			};
@@ -89,7 +96,19 @@ namespace Print4e.Common
 		///    An implementation of <see cref="IObservableMap&lt;String, Object&gt;" /> designed to be
 		///    used as a trivial view model.
 		/// </summary>
-		protected IObservableMap<String, Object> DefaultViewModel { get { return GetValue(DefaultViewModelProperty) as IObservableMap<String, Object>; } set { SetValue(DefaultViewModelProperty, value); } }
+		[NotNull]
+		protected IObservableMap<String, Object> DefaultViewModel
+		{
+			get
+			{
+				// ReSharper disable AssignNullToNotNullAttribute
+				return (IObservableMap<string, object>) GetValue(DefaultViewModelProperty);
+				// ReSharper restore AssignNullToNotNullAttribute
+			}
+			set { SetValue(DefaultViewModelProperty, value); }
+		}
+
+		public LayoutUpdateMonitor LayoutUpdateMonitor { get { return _layoutUpdateMonitor; } }
 
 		#region Navigation support
 		/// <summary>
@@ -149,36 +168,11 @@ namespace Print4e.Common
 		/// <param name="args">Event data describing the conditions that led to the event.</param>
 		private void CoreDispatcher_AcceleratorKeyActivated(CoreDispatcher sender, AcceleratorKeyEventArgs args)
 		{
-			var virtualKey = args.VirtualKey;
+			if (args == null) return;
+			if (args.EventType != CoreAcceleratorKeyEventType.SystemKeyDown
+				&& args.EventType != CoreAcceleratorKeyEventType.KeyDown) return;
 
-			// Only investigate further when Left, Right, or the dedicated Previous or Next keys
-			// are pressed
-			if ((args.EventType == CoreAcceleratorKeyEventType.SystemKeyDown
-				|| args.EventType == CoreAcceleratorKeyEventType.KeyDown)
-				&& (virtualKey == VirtualKey.Left || virtualKey == VirtualKey.Right || (int) virtualKey == 166
-					|| (int) virtualKey == 167))
-			{
-				var coreWindow = Window.Current.CoreWindow;
-				var downState = CoreVirtualKeyStates.Down;
-				var menuKey = (coreWindow.GetKeyState(VirtualKey.Menu) & downState) == downState;
-				var controlKey = (coreWindow.GetKeyState(VirtualKey.Control) & downState) == downState;
-				var shiftKey = (coreWindow.GetKeyState(VirtualKey.Shift) & downState) == downState;
-				var noModifiers = !menuKey && !controlKey && !shiftKey;
-				var onlyAlt = menuKey && !controlKey && !shiftKey;
-
-				if (((int) virtualKey == 166 && noModifiers) || (virtualKey == VirtualKey.Left && onlyAlt))
-				{
-					// When the previous key or Alt+Left are pressed navigate back
-					args.Handled = true;
-					GoBack(this, new RoutedEventArgs());
-				}
-				else if (((int) virtualKey == 167 && noModifiers) || (virtualKey == VirtualKey.Right && onlyAlt))
-				{
-					// When the next key or Alt+Right are pressed navigate forward
-					args.Handled = true;
-					GoForward(this, new RoutedEventArgs());
-				}
-			}
+			args.Handled = HandleNavigationKeyCommands(args.VirtualKey);
 		}
 
 		/// <summary>
@@ -190,35 +184,66 @@ namespace Print4e.Common
 		/// <param name="args">Event data describing the conditions that led to the event.</param>
 		private void CoreWindow_PointerPressed(CoreWindow sender, PointerEventArgs args)
 		{
+			if (args == null || args.CurrentPoint == null) return;
 			var properties = args.CurrentPoint.Properties;
+			if (properties == null) return;
+			args.Handled = HandleMouseNavigationButtonCommands(properties);
+		}
 
-			// Ignore button chords with the left, right, and middle buttons
-			if (properties.IsLeftButtonPressed || properties.IsRightButtonPressed || properties.IsMiddleButtonPressed) return;
+		private bool HandleNavigationKeyCommands(VirtualKey virtualKey)
+		{
+			var keyCode = (int) virtualKey;
+			const int previousButton = 166;
+			const int nextButton = 167;
 
-			// If back or foward are pressed (but not both) navigate appropriately
+			if (virtualKey != VirtualKey.Left && virtualKey != VirtualKey.Right && keyCode != previousButton
+				&& keyCode != nextButton) return false;
+
+			var modifiers = ModifierKeys.Current();
+
+			if ((keyCode == previousButton && modifiers.None) || (virtualKey == VirtualKey.Left && modifiers.OnlyAlt))
+			{
+				GoBack(this, new RoutedEventArgs());
+				return true;
+			}
+			if ((keyCode == nextButton && modifiers.None) || (virtualKey == VirtualKey.Right && modifiers.OnlyAlt))
+			{
+				GoForward(this, new RoutedEventArgs());
+				return true;
+			}
+			return false;
+		}
+
+		private bool HandleMouseNavigationButtonCommands([NotNull] PointerPointProperties properties)
+		{
+			if (properties.IsLeftButtonPressed || properties.IsRightButtonPressed || properties.IsMiddleButtonPressed) return false;
+
 			var backPressed = properties.IsXButton1Pressed;
 			var forwardPressed = properties.IsXButton2Pressed;
-			if (backPressed ^ forwardPressed)
+			if (backPressed && !forwardPressed)
 			{
-				args.Handled = true;
-				if (backPressed) GoBack(this, new RoutedEventArgs());
-				if (forwardPressed) GoForward(this, new RoutedEventArgs());
+				GoBack(this, new RoutedEventArgs());
+				return true;
 			}
+			if (forwardPressed && !backPressed)
+			{
+				GoForward(this, new RoutedEventArgs());
+				return true;
+			}
+			return false;
 		}
 		#endregion
 
 		#region Visual state switching
+		[NotNull] private readonly LayoutUpdateMonitor _layoutUpdateMonitor;
+
 		/// <summary>
 		///    Invoked as an event handler, typically on the <see cref="FrameworkElement.Loaded" />
 		///    event of a <see cref="Control" /> within the page, to indicate that the sender should
 		///    start receiving visual state management changes that correspond to application view
 		///    state changes.
 		/// </summary>
-		/// <param name="sender">
-		///    Instance of <see cref="Control" /> that supports visual state
-		///    management corresponding to view states.
-		/// </param>
-		/// <param name="e">Event data that describes how the request was made.</param>
+		/// <param name="control"></param>
 		/// <remarks>
 		///    The current view state will immediately be used to set the corresponding
 		///    visual state when layout updates are requested.  A corresponding
@@ -227,55 +252,35 @@ namespace Print4e.Common
 		///    <see cref="LayoutAwarePage" /> automatically invoke these handlers in their Loaded and
 		///    Unloaded events.
 		/// </remarks>
-		/// <seealso cref="DetermineVisualState" />
-		/// <seealso cref="InvalidateVisualState" />
-		public void StartLayoutUpdates(object sender, RoutedEventArgs e)
+		public void StartLayoutUpdates(Control control)
 		{
-			var control = sender as Control;
-			if (control == null) return;
-			if (_layoutAwareControls == null)
-			{
-				// Start listening to view state changes when there are controls interested in updates
-				Window.Current.SizeChanged += WindowSizeChanged;
-				_layoutAwareControls = new List<Control>();
-			}
-			_layoutAwareControls.Add(control);
-
-			// Set the initial visual state of the control
-			VisualStateManager.GoToState(control, DetermineVisualState(ApplicationView.Value), false);
-		}
-
-		private void WindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
-		{
-			InvalidateVisualState();
+			_layoutUpdateMonitor.StartLayoutUpdates(control);
 		}
 
 		/// <summary>
 		///    Invoked as an event handler, typically on the <see cref="FrameworkElement.Unloaded" />
-		///    event of a <see cref="Control" />, to indicate that the sender should start receiving
+		///    event of a <see cref="Control" />, to indicate that the sender should stop receiving
 		///    visual state management changes that correspond to application view state changes.
 		/// </summary>
-		/// <param name="sender">
-		///    Instance of <see cref="Control" /> that supports visual state
-		///    management corresponding to view states.
-		/// </param>
-		/// <param name="e">Event data that describes how the request was made.</param>
-		/// <remarks>
-		///    The current view state will immediately be used to set the corresponding
-		///    visual state when layout updates are requested.
-		/// </remarks>
+		/// <param name="control"></param>
 		/// <seealso cref="StartLayoutUpdates" />
-		public void StopLayoutUpdates(object sender, RoutedEventArgs e)
+		public void StopLayoutUpdates([CanBeNull] Control control)
 		{
-			var control = sender as Control;
-			if (control == null || _layoutAwareControls == null) return;
-			_layoutAwareControls.Remove(control);
-			if (_layoutAwareControls.Count == 0)
-			{
-				// Stop listening to view state changes when no controls are interested in updates
-				_layoutAwareControls = null;
-				Window.Current.SizeChanged -= WindowSizeChanged;
-			}
+			_layoutUpdateMonitor.StopLayoutUpdates(control);
+		}
+
+		/// <summary>
+		///    Updates all controls that are listening for visual state changes with the correct
+		///    visual state.
+		/// </summary>
+		/// <remarks>
+		///    Typically used in conjunction with overriding <see cref="LayoutAwarePage.DetermineVisualState" /> to
+		///    signal that a different value may be returned even though the view state has not
+		///    changed.
+		/// </remarks>
+		public void InvalidateVisualState()
+		{
+			_layoutUpdateMonitor.InvalidateVisualState();
 		}
 
 		/// <summary>
@@ -288,31 +293,10 @@ namespace Print4e.Common
 		///    Visual state name used to drive the
 		///    <see cref="VisualStateManager" />
 		/// </returns>
-		/// <seealso cref="InvalidateVisualState" />
-		protected virtual string DetermineVisualState(ApplicationViewState viewState)
+		[NotNull]
+		public virtual string DetermineVisualState(ApplicationViewState viewState)
 		{
-			return viewState.ToString();
-		}
-
-		/// <summary>
-		///    Updates all controls that are listening for visual state changes with the correct
-		///    visual state.
-		/// </summary>
-		/// <remarks>
-		///    Typically used in conjunction with overriding <see cref="DetermineVisualState" /> to
-		///    signal that a different value may be returned even though the view state has not
-		///    changed.
-		/// </remarks>
-		public void InvalidateVisualState()
-		{
-			if (_layoutAwareControls != null)
-			{
-				var visualState = DetermineVisualState(ApplicationView.Value);
-				foreach (var layoutAwareControl in _layoutAwareControls)
-				{
-					VisualStateManager.GoToState(layoutAwareControl, visualState, false);
-				}
-			}
+			return viewState.ToString() ?? "";
 		}
 		#endregion
 
@@ -330,23 +314,16 @@ namespace Print4e.Common
 		{
 			// Returning to a cached page through navigation shouldn't trigger state loading
 			if (_pageKey != null) return;
+			Debug.Assert(e != null, "e != null");
 
+			Debug.Assert(Frame != null, "Frame != null");
 			var frameState = SuspensionManager.SessionStateForFrame(Frame);
 			_pageKey = "Page-" + Frame.BackStackDepth;
 
 			if (e.NavigationMode == NavigationMode.New)
 			{
-				// Clear existing state for forward navigation when adding a new page to the
-				// navigation stack
-				var nextPageKey = _pageKey;
-				var nextPageIndex = Frame.BackStackDepth;
-				while (frameState.Remove(nextPageKey))
-				{
-					nextPageIndex++;
-					nextPageKey = "Page-" + nextPageIndex;
-				}
-
-				// Pass the navigation parameter to the new page
+				// Adding a new page to the navigation stack
+				RemoveForwardNavigationCachedPages(frameState, Frame.BackStackDepth);
 				LoadState(e.Parameter, null);
 			}
 			else
@@ -354,7 +331,21 @@ namespace Print4e.Common
 				// Pass the navigation parameter and preserved page state to the page, using
 				// the same strategy for loading suspended state and recreating pages discarded
 				// from cache
-				LoadState(e.Parameter, (Dictionary<String, Object>) frameState[_pageKey]);
+				object pageState = null;
+				if (frameState != null) frameState.TryGetValue(_pageKey, out pageState);
+				LoadState(e.Parameter, (Dictionary<string, object>) pageState);
+			}
+		}
+
+		private void RemoveForwardNavigationCachedPages([CanBeNull] IDictionary<string, object> frameState, int currentPageIndex)
+		{
+			if (frameState == null) return;
+			var nextPageKey = _pageKey;
+			var nextPageIndex = currentPageIndex;
+			while (frameState.Remove(nextPageKey))
+			{
+				nextPageIndex++;
+				nextPageKey = "Page-" + nextPageIndex;
 			}
 		}
 
@@ -395,129 +386,5 @@ namespace Print4e.Common
 		/// <param name="pageState">An empty dictionary to be populated with serializable state.</param>
 		protected virtual void SaveState(Dictionary<String, Object> pageState) {}
 		#endregion
-
-		/// <summary>
-		///    Implementation of IObservableMap that supports reentrancy for use as a default view
-		///    model.
-		/// </summary>
-		private class ObservableDictionary<K, V> : IObservableMap<K, V>
-		{
-			private class ObservableDictionaryChangedEventArgs : IMapChangedEventArgs<K>
-			{
-				public ObservableDictionaryChangedEventArgs(CollectionChange change, K key)
-				{
-					CollectionChange = change;
-					Key = key;
-				}
-
-				public CollectionChange CollectionChange { get; private set; }
-				public K Key { get; private set; }
-			}
-
-			private readonly Dictionary<K, V> _dictionary = new Dictionary<K, V>();
-			public event MapChangedEventHandler<K, V> MapChanged;
-
-			private void InvokeMapChanged(CollectionChange change, K key)
-			{
-				var eventHandler = MapChanged;
-				if (eventHandler != null) eventHandler(this, new ObservableDictionaryChangedEventArgs(change, key));
-			}
-
-			public void Add(K key, V value)
-			{
-				_dictionary.Add(key, value);
-				InvokeMapChanged(CollectionChange.ItemInserted, key);
-			}
-
-			public void Add(KeyValuePair<K, V> item)
-			{
-				Add(item.Key, item.Value);
-			}
-
-			public bool Remove(K key)
-			{
-				if (_dictionary.Remove(key))
-				{
-					InvokeMapChanged(CollectionChange.ItemRemoved, key);
-					return true;
-				}
-				return false;
-			}
-
-			public bool Remove(KeyValuePair<K, V> item)
-			{
-				V currentValue;
-				if (_dictionary.TryGetValue(item.Key, out currentValue) && Equals(item.Value, currentValue)
-					&& _dictionary.Remove(item.Key))
-				{
-					InvokeMapChanged(CollectionChange.ItemRemoved, item.Key);
-					return true;
-				}
-				return false;
-			}
-
-			public V this[K key]
-			{
-				get { return _dictionary[key]; }
-				set
-				{
-					_dictionary[key] = value;
-					InvokeMapChanged(CollectionChange.ItemChanged, key);
-				}
-			}
-
-			public void Clear()
-			{
-				var priorKeys = _dictionary.Keys.ToArray();
-				_dictionary.Clear();
-				foreach (var key in priorKeys)
-				{
-					InvokeMapChanged(CollectionChange.ItemRemoved, key);
-				}
-			}
-
-			public ICollection<K> Keys { get { return _dictionary.Keys; } }
-
-			public bool ContainsKey(K key)
-			{
-				return _dictionary.ContainsKey(key);
-			}
-
-			public bool TryGetValue(K key, out V value)
-			{
-				return _dictionary.TryGetValue(key, out value);
-			}
-
-			public ICollection<V> Values { get { return _dictionary.Values; } }
-
-			public bool Contains(KeyValuePair<K, V> item)
-			{
-				return _dictionary.Contains(item);
-			}
-
-			public int Count { get { return _dictionary.Count; } }
-
-			public bool IsReadOnly { get { return false; } }
-
-			public IEnumerator<KeyValuePair<K, V>> GetEnumerator()
-			{
-				return _dictionary.GetEnumerator();
-			}
-
-			IEnumerator IEnumerable.GetEnumerator()
-			{
-				return _dictionary.GetEnumerator();
-			}
-
-			public void CopyTo(KeyValuePair<K, V>[] array, int arrayIndex)
-			{
-				var arraySize = array.Length;
-				foreach (var pair in _dictionary)
-				{
-					if (arrayIndex >= arraySize) break;
-					array[arrayIndex++] = pair;
-				}
-			}
-		}
 	}
 }
